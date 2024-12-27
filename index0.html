@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FedEx SMART Routing</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <style>
+        #map { height: 400px; width: 100%; }
+    </style>
+</head>
+<body>
+    <h1>FedEx SMART Routing</h1>
+    <form id="route-form">
+        <label for="start-lat">Start Latitude:</label>
+        <input type="number" id="start-lat" step="0.000001" required>
+        
+        <label for="start-lon">Start Longitude:</label>
+        <input type="number" id="start-lon" step="0.000001" required>
+        
+        <label for="end-lat">End Latitude:</label>
+        <input type="number" id="end-lat" step="0.000001" required>
+        
+        <label for="end-lon">End Longitude:</label>
+        <input type="number" id="end-lon" step="0.000001" required>
+        
+        <label for="vehicle-type">Vehicle Type:</label>
+        <select id="vehicle-type" required>
+            <option value="small_van">Small Van</option>
+            <option value="large_van">Large Van</option>
+            <option value="truck">Truck</option>
+        </select>
+        
+        <button type="submit">Optimize Route</button>
+    </form>
+    
+    <div id="result"></div>
+    <div id="map"></div>
+
+    <script>
+        const map = L.map('map').setView([40, -74.5], 9);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+
+        let routeLayer;
+
+        document.getElementById('route-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = {
+                start_lat: document.getElementById('start-lat').value,
+                start_lon: document.getElementById('start-lon').value,
+                end_lat: document.getElementById('end-lat').value,
+                end_lon: document.getElementById('end-lon').value,
+                vehicle_type: document.getElementById('vehicle-type').value
+            };
+
+            const response = await fetch('/optimize', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(formData)
+            });
+
+            const result = await response.json();
+            displayResult(result);
+        });
+
+        function displayResult(result) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = `
+                <h2>Optimized Route</h2>
+                <p>Distance: ${result.distance.toFixed(2)} km</p>
+                <p>Traffic Delay: ${result.traffic_delay} seconds</p>
+                <p>Weather Condition (AQI): ${result.weather_condition}</p>
+                <p>Estimated Emissions: ${result.emissions.toFixed(2)} g CO2</p>
+            `;
+
+            // Display route on map
+            if (routeLayer) {
+                map.removeLayer(routeLayer);
+            }
+
+            const routeCoordinates = result.route.map(coord => [coord[1], coord[0]]);
+            routeLayer = L.polyline(routeCoordinates, {color: 'red'}).addTo(map);
+            map.fitBounds(routeLayer.getBounds());
+        }
+    </script>
+</body>
+</html>
+
